@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            touch-action: none;
+            background-color: #000;
+        }
+
+        /* Lớp gradient ẩn dưới màn đen */
+        .gradient-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            opacity: 0;
+            transition: opacity 1.5s ease;
+        }
+
+        /* Lớp màn đen phủ lên trên */
+        .black-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            z-index: 2;
+            cursor: grab;
+        }
+
+        /* Thông điệp xin lỗi ẩn ban đầu */
+        .message-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 3;
+            opacity: 0;
+            transition: opacity 1.5s ease;
+            pointer-events: none;
+        }
+
+        .apology-message {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px 40px;
+            border-radius: 25px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            max-width: 85%;
+            text-align: center;
+            transform: translateY(30px);
+            transition: transform 1.2s ease;
+            margin-bottom: 40px;
+        }
+
+        .apology-message h1 {
+            font-size: 1.8rem;
+            color: #ff3366;
+            line-height: 1.4;
+        }
+
+        /* Container cho hiệu ứng tim rơi */
+        .hearts-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 4;
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+
+        /* Các trái tim rơi */
+        .falling-heart {
+            position: absolute;
+            top: -50px;
+            color: #ff3366;
+            font-size: 28px;
+            opacity: 0;
+            text-shadow: 0 0 10px rgba(255, 51, 102, 0.7);
+            animation: heartFall linear forwards;
+        }
+
+        @keyframes heartFall {
+            to {
+                transform: translateY(110vh) rotate(360deg);
+                opacity: 0.8;
+            }
+        }
+
+        /* Phần điều khiển âm thanh */
+        .audio-control {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .audio-btn {
+            background-color: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 24px;
+            color: #ff3366;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Responsive cho màn hình nhỏ */
+        @media (max-width: 768px) {
+            .apology-message {
+                padding: 25px 30px;
+            }
+            
+            .apology-message h1 {
+                font-size: 1.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .apology-message {
+                padding: 20px 25px;
+            }
+            
+            .apology-message h1 {
+                font-size: 1.3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Lớp gradient sẽ hiện ra khi vuốt -->
+    <div class="gradient-bg" id="gradientBg"></div>
+    
+    <!-- Lớp màn đen phủ lên -->
+    <div class="black-overlay" id="blackOverlay"></div>
+    
+    <!-- Container cho thông điệp -->
+    <div class="message-container" id="messageContainer">
+        <div class="apology-message">
+            <h1>Tớ xin lỗi em bé lợn ngốc của tớ nkaaaaa</h1>
+        </div>
+    </div>
+    
+    <!-- Container cho hiệu ứng tim rơi -->
+    <div class="hearts-container" id="heartsContainer"></div>
+    
+    <!-- Nút điều khiển âm thanh -->
+    <div class="audio-control" id="audioControl">
+        <button class="audio-btn" id="audioBtn">
+            <i class="fas fa-volume-mute"></i>
+        </button>
+    </div>
+    
+    <!-- Element để phát âm thanh -->
+    <audio id="apologyAudio">
+        <source src="v1.m4a" type="audio/mp4">
+        <source src="v1.mp3" type="audio/mpeg">
+        <source src="v1.ogg" type="audio/ogg">
+        <source src="v1.wav" type="audio/wav">
+        Trình duyệt của bạn không hỗ trợ phát âm thanh.
+    </audio>
+
+    <script>
+        // Khai báo các biến toàn cục
+        let canvas;
+        let ctx;
+        let gradientCanvas;
+        let gradientCtx;
+        let isErasing = false;
+        let erasedPercentage = 0;
+        let totalPixels;
+        let audioPlayed = false;
+        let startTime = Date.now();
+        
+        // Màu sắc lung linh cho gradient
+        const colors = [
+            '#ff3366', '#ff6633', '#ffcc33', '#33ff66',
+            '#33ccff', '#3366ff', '#9966ff', '#ff33cc',
+            '#ff3333', '#33ffcc', '#cc33ff', '#ff9933'
+        ];
+        
+        // Hàm khởi tạo khi trang đã tải xong
+        window.addEventListener('DOMContentLoaded', () => {
+            initApp();
+        });
+        
+        function initApp() {
+            // Lấy các phần tử DOM cần thiết
+            const blackOverlay = document.getElementById('blackOverlay');
+            const gradientBg = document.getElementById('gradientBg');
+            const messageContainer = document.getElementById('messageContainer');
+            const heartsContainer = document.getElementById('heartsContainer');
+            const audioControl = document.getElementById('audioControl');
+            const audioBtn = document.getElementById('audioBtn');
+            const apologyAudio = document.getElementById('apologyAudio');
+            
+            // Tạo canvas để xử lý hiệu ứng xóa
+            canvas = document.createElement('canvas');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            canvas.style.position = 'fixed';
+            canvas.style.top = '0';
+            canvas.style.left = '0';
+            canvas.style.zIndex = '2';
+            canvas.style.pointerEvents = 'none';
+            document.body.appendChild(canvas);
+            
+            ctx = canvas.getContext('2d');
+            // Vẽ lớp đen lên canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Tạo canvas cho gradient động
+            gradientCanvas = document.createElement('canvas');
+            gradientCanvas.width = window.innerWidth;
+            gradientCanvas.height = window.innerHeight;
+            gradientCanvas.style.position = 'fixed';
+            gradientCanvas.style.top = '0';
+            gradientCanvas.style.left = '0';
+            gradientCanvas.style.zIndex = '1';
+            gradientCanvas.style.pointerEvents = 'none';
+            gradientCanvas.style.display = 'block';
+            document.body.appendChild(gradientCanvas);
+            
+            gradientCtx = gradientCanvas.getContext('2d');
+            
+            // Tính tổng số pixel để theo dõi phần trăm đã xóa
+            totalPixels = canvas.width * canvas.height;
+            
+            // Vẽ gradient lung linh ban đầu
+            drawGradientBackground();
+            
+            // Xử lý sự kiện vuốt/touch
+            blackOverlay.addEventListener('touchstart', handleTouchStart);
+            blackOverlay.addEventListener('touchmove', handleTouchMove);
+            blackOverlay.addEventListener('touchend', handleTouchEnd);
+            
+            // Xử lý sự kiện chuột cho desktop
+            blackOverlay.addEventListener('mousedown', handleMouseDown);
+            blackOverlay.addEventListener('mousemove', handleMouseMove);
+            blackOverlay.addEventListener('mouseup', handleMouseUp);
+            blackOverlay.addEventListener('mouseleave', handleMouseUp);
+            
+            // Xử lý sự kiện cho nút âm thanh
+            audioBtn.addEventListener('click', toggleAudio);
+            
+            // Xử lý sự kiện thay đổi kích thước cửa sổ
+            window.addEventListener('resize', handleResize);
+            
+            // Bắt đầu animation cho gradient
+            animateGradient();
+            
+            // Hàm xử lý bắt đầu vuốt/touch
+            function handleTouchStart(e) {
+                e.preventDefault();
+                isErasing = true;
+                const touch = e.touches[0];
+                eraseAt(touch.clientX, touch.clientY);
+                createGlowEffect(touch.clientX, touch.clientY);
+            }
+            
+            // Hàm xử lý khi đang vuốt
+            function handleTouchMove(e) {
+                e.preventDefault();
+                if (!isErasing) return;
+                
+                const touch = e.touches[0];
+                eraseAt(touch.clientX, touch.clientY);
+                createGlowEffect(touch.clientX, touch.clientY);
+                updateProgress();
+            }
+            
+            // Hàm xử lý khi kết thúc vuốt
+            function handleTouchEnd() {
+                isErasing = false;
+                updateProgress();
+            }
+            
+            // Hàm xử lý khi nhấn chuột
+            function handleMouseDown(e) {
+                e.preventDefault();
+                isErasing = true;
+                eraseAt(e.clientX, e.clientY);
+                createGlowEffect(e.clientX, e.clientY);
+            }
+            
+            // Hàm xử lý khi di chuyển chuột
+            function handleMouseMove(e) {
+                e.preventDefault();
+                if (!isErasing) return;
+                
+                eraseAt(e.clientX, e.clientY);
+                createGlowEffect(e.clientX, e.clientY);
+                updateProgress();
+            }
+            
+            // Hàm xử lý khi nhả chuột
+            function handleMouseUp() {
+                isErasing = false;
+                updateProgress();
+            }
+            
+            // Hàm xóa tại vị trí x, y
+            function eraseAt(x, y) {
+                // Sử dụng composite operation để "xóa" pixels
+                ctx.globalCompositeOperation = 'destination-out';
+                
+                // Vẽ một vòng tròn để xóa với kích thước ngẫu nhiên
+                const radius = 35 + Math.random() * 15;
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Trả lại composite operation về mặc định
+                ctx.globalCompositeOperation = 'source-over';
+                
+                // Tạo hiệu ứng màu sắc tại vị trí xóa
+                createColorEffect(x, y);
+            }
+            
+            // Hàm tạo hiệu ứng màu sắc tại vị trí xóa
+            function createColorEffect(x, y) {
+                // Tạo một div cho hiệu ứng màu sắc
+                const colorEffect = document.createElement('div');
+                colorEffect.style.position = 'fixed';
+                colorEffect.style.borderRadius = '50%';
+                colorEffect.style.transform = 'translate(-50%, -50%)';
+                colorEffect.style.pointerEvents = 'none';
+                colorEffect.style.zIndex = '1';
+                
+                // Chọn màu ngẫu nhiên từ mảng colors
+                const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                
+                // Tạo gradient radial cho hiệu ứng
+                colorEffect.style.background = `radial-gradient(circle, ${randomColor} 0%, rgba(255,255,255,0) 70%)`;
+                colorEffect.style.width = '120px';
+                colorEffect.style.height = '120px';
+                colorEffect.style.left = `${x}px`;
+                colorEffect.style.top = `${y}px`;
+                colorEffect.style.opacity = '0.8';
+                
+                document.body.appendChild(colorEffect);
+                
+                // Hiệu ứng biến mất
+                setTimeout(() => {
+                    colorEffect.style.opacity = '0';
+                    colorEffect.style.transition = 'opacity 0.8s ease, transform 0.8s ease';
+                    colorEffect.style.transform = 'translate(-50%, -50%) scale(1.5)';
+                    
+                    setTimeout(() => {
+                        if (colorEffect.parentNode) {
+                            document.body.removeChild(colorEffect);
+                        }
+                    }, 800);
+                }, 100);
+            }
+            
+            // Hàm tạo hiệu ứng sáng tại vị trí xóa
+            function createGlowEffect(x, y) {
+                const glow = document.createElement('div');
+                glow.style.position = 'fixed';
+                glow.style.borderRadius = '50%';
+                glow.style.background = 'radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 70%)';
+                glow.style.transform = 'translate(-50%, -50%)';
+                glow.style.pointerEvents = 'none';
+                glow.style.zIndex = '2';
+                glow.style.width = '80px';
+                glow.style.height = '80px';
+                glow.style.left = `${x}px`;
+                glow.style.top = `${y}px`;
+                glow.style.opacity = '0.7';
+                
+                document.body.appendChild(glow);
+                
+                // Hiệu ứng biến mất
+                setTimeout(() => {
+                    glow.style.opacity = '0';
+                    glow.style.transition = 'opacity 0.5s ease';
+                    
+                    setTimeout(() => {
+                        if (glow.parentNode) {
+                            document.body.removeChild(glow);
+                        }
+                    }, 500);
+                }, 100);
+            }
+            
+            // Hàm vẽ gradient lung linh
+            function drawGradientBackground() {
+                // Tạo gradient động với nhiều màu sắc
+                const gradient = gradientCtx.createLinearGradient(
+                    0, 0, gradientCanvas.width, gradientCanvas.height
+                );
+                
+                // Thêm nhiều điểm màu cho gradient lung linh
+                const time = (Date.now() - startTime) * 0.001;
+                
+                // Sử dụng các màu từ mảng colors, thay đổi theo thời gian
+                for (let i = 0; i < colors.length; i++) {
+                    const position = (Math.sin(time * 0.5 + i * 0.5) + 1) / 2;
+                    gradient.addColorStop(position, colors[i]);
+                }
+                
+                gradientCtx.fillStyle = gradient;
+                gradientCtx.fillRect(0, 0, gradientCanvas.width, gradientCanvas.height);
+                
+                // Thêm hiệu ứng hạt sáng
+                addSparkles();
+            }
+            
+            // Hàm thêm các hạt sáng lung linh
+            function addSparkles() {
+                gradientCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                
+                // Vẽ các hạt sáng ngẫu nhiên
+                for (let i = 0; i < 50; i++) {
+                    const x = Math.random() * gradientCanvas.width;
+                    const y = Math.random() * gradientCanvas.height;
+                    const size = Math.random() * 3 + 1;
+                    
+                    gradientCtx.beginPath();
+                    gradientCtx.arc(x, y, size, 0, Math.PI * 2);
+                    gradientCtx.fill();
+                }
+            }
+            
+            // Hàm animate gradient
+            function animateGradient() {
+                drawGradientBackground();
+                requestAnimationFrame(animateGradient);
+            }
+            
+            // Hàm cập nhật tiến độ xóa
+            function updateProgress() {
+                // Lấy dữ liệu pixel từ canvas
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+                
+                // Đếm số pixel đã bị xóa (alpha = 0)
+                let erasedCount = 0;
+                for (let i = 3; i < data.length; i += 4) {
+                    if (data[i] === 0) erasedCount++;
+                }
+                
+                // Tính phần trăm đã xóa
+                erasedPercentage = (erasedCount / totalPixels) * 100;
+                
+                // Hiển thị nền gradient dần dần
+                gradientBg.style.opacity = Math.min(erasedPercentage / 100, 1);
+                
+                // Khi xóa được 70% trở lên, hiển thị thông điệp và tim rơi
+                if (erasedPercentage > 70) {
+                    // Hiển thị thông điệp
+                    messageContainer.style.opacity = 1;
+                    document.querySelector('.apology-message').style.transform = 'translateY(0)';
+                    
+                    // Hiển thị tim rơi
+                    heartsContainer.style.opacity = 1;
+                    
+                    // Hiển thị nút điều khiển âm thanh
+                    audioControl.style.opacity = 1;
+                    
+                    // Phát âm thanh nếu chưa phát
+                    if (!audioPlayed) {
+                        playApologyAudio();
+                        audioPlayed = true;
+                    }
+                    
+                    // Tạo hiệu ứng tim rơi
+                    createFallingHearts();
+                }
+                
+                // Khi xóa được 90% trở lên, ẩn canvas để thấy rõ nền và thông điệp
+                if (erasedPercentage > 90) {
+                    canvas.style.opacity = '0';
+                    canvas.style.transition = 'opacity 1s ease';
+                    blackOverlay.style.cursor = 'default';
+                }
+            }
+            
+            // Hàm tạo hiệu ứng tim rơi
+            function createFallingHearts() {
+                // Tạo 15 trái tim
+                for (let i = 0; i < 15; i++) {
+                    setTimeout(() => {
+                        const heart = document.createElement('div');
+                        heart.className = 'falling-heart';
+                        heart.innerHTML = '❤️';
+                        
+                        // Vị trí ngẫu nhiên trên màn hình
+                        heart.style.left = `${Math.random() * 100}vw`;
+                        
+                        // Thời gian rơi ngẫu nhiên
+                        const duration = Math.random() * 5 + 5;
+                        heart.style.animationDuration = `${duration}s`;
+                        
+                        // Kích thước ngẫu nhiên
+                        const size = Math.random() * 20 + 20;
+                        heart.style.fontSize = `${size}px`;
+                        
+                        // Màu sắc ngẫu nhiên
+                        const colorIndex = Math.floor(Math.random() * colors.length);
+                        heart.style.color = colors[colorIndex];
+                        
+                        heartsContainer.appendChild(heart);
+                        
+                        // Bắt đầu animation
+                        setTimeout(() => {
+                            heart.style.opacity = '1';
+                        }, 10);
+                        
+                        // Xóa tim sau khi rơi xong
+                        setTimeout(() => {
+                            if (heart.parentNode) {
+                                heart.parentNode.removeChild(heart);
+                            }
+                        }, duration * 1000);
+                    }, i * 300); // Tạo mỗi tim cách nhau 300ms
+                }
+                
+                // Tiếp tục tạo tim mới sau mỗi 5 giây
+                setTimeout(createFallingHearts, 5000);
+            }
+            
+            // Hàm phát âm thanh xin lỗi
+            function playApologyAudio() {
+                // Đặt volume
+                apologyAudio.volume = 0.7;
+                
+                // Thử phát âm thanh
+                const playPromise = apologyAudio.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise.catch(e => {
+                        console.log("Không thể phát âm thanh tự động, cần tương tác của người dùng");
+                        // Hiển thị nút play để người dùng click
+                        audioBtn.innerHTML = '<i class="fas fa-play"></i>';
+                        audioBtn.style.display = 'flex';
+                    });
+                }
+            }
+            
+            // Hàm bật/tắt âm thanh
+            function toggleAudio() {
+                if (apologyAudio.paused) {
+                    apologyAudio.play();
+                    audioBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                } else {
+                    apologyAudio.pause();
+                    audioBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+                }
+            }
+            
+            // Hàm xử lý khi thay đổi kích thước cửa sổ
+            function handleResize() {
+                // Cập nhật kích thước canvas
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                gradientCanvas.width = window.innerWidth;
+                gradientCanvas.height = window.innerHeight;
+                
+                // Vẽ lại lớp đen
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Tính lại tổng số pixel
+                totalPixels = canvas.width * canvas.height;
+                
+                // Cập nhật lại tiến độ
+                updateProgress();
+            }
+        }
+        
+        // Ngăn chặn các hành vi mặc định có thể cản trở trải nghiệm vuốt
+        document.addEventListener('touchmove', function(e) {
+            if (e.target.id === 'blackOverlay') {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        // Thêm FontAwesome cho icon âm thanh
+        const faLink = document.createElement('link');
+        faLink.rel = 'stylesheet';
+        faLink.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css';
+        document.head.appendChild(faLink);
+    </script>
+</body>
+</html>
